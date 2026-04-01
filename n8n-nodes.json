@@ -1,5 +1,5 @@
 {
-  "name": "Parallel Google Sheets Search (Production)",
+  "name": "Parallel Google Sheets Search (Safe Version)",
   "nodes": [
     {
       "parameters": {},
@@ -11,48 +11,23 @@
     },
     {
       "parameters": {
-        "values": {
-          "json": [
-            {
-              "sheetId": "SHEET_ID_1",
-              "sheetName": "Sheet1"
-            },
-            {
-              "sheetId": "SHEET_ID_2",
-              "sheetName": "Sheet2"
-            },
-            {
-              "sheetId": "SHEET_ID_3",
-              "sheetName": "Sheet3"
-            }
-          ]
-        }
+        "functionCode": "return [\n  { json: { sheetId: \"SHEET_ID_1\", sheetName: \"Sheet1\" } },\n  { json: { sheetId: \"SHEET_ID_2\", sheetName: \"Sheet2\" } },\n  { json: { sheetId: \"SHEET_ID_3\", sheetName: \"Sheet3\" } }\n];"
       },
-      "id": "SetSheets",
-      "name": "Set Sheets",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 2,
+      "id": "PrepareSheets",
+      "name": "Prepare Sheets",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
       "position": [400, 300]
-    },
-    {
-      "parameters": {
-        "fieldToSplitOut": "json"
-      },
-      "id": "SplitOut",
-      "name": "Split Sheets",
-      "type": "n8n-nodes-base.itemLists",
-      "typeVersion": 3,
-      "position": [600, 300]
     },
     {
       "parameters": {
         "batchSize": 3
       },
       "id": "SplitInBatches",
-      "name": "Control Parallelism",
+      "name": "Control Parallel",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 1,
-      "position": [800, 300]
+      "position": [600, 300]
     },
     {
       "parameters": {
@@ -60,11 +35,11 @@
         "sheetId": "={{$json.sheetId}}",
         "range": "={{$json.sheetName}}!A:Z"
       },
-      "id": "GoogleSheets",
+      "id": "ReadSheet",
       "name": "Read Sheet",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [1000, 300],
+      "position": [800, 300],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "__YOUR_CREDENTIAL__",
@@ -74,13 +49,13 @@
     },
     {
       "parameters": {
-        "functionCode": "return items.filter(item => {\n  return item.json.status === \"ACTIVE\" && Number(item.json.amount || 0) > 1000000;\n});"
+        "functionCode": "const sheetName = $json.sheetName;\n\nreturn items\n  .filter(item => {\n    return item.json.status === \"ACTIVE\" && Number(item.json.amount || 0) > 1000000;\n  })\n  .map(item => {\n    item.json.source_sheet = sheetName;\n    return item;\n  });"
       },
       "id": "FilterData",
-      "name": "Filter Criteria",
+      "name": "Filter & Enrich",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [1200, 300]
+      "position": [1000, 300]
     },
     {
       "parameters": {
@@ -90,18 +65,17 @@
       "name": "Merge Results",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2,
-      "position": [1400, 300]
+      "position": [1200, 300]
     },
     {
       "parameters": {
-        "operation": "aggregateItems",
-        "destinationFieldName": "data"
+        "functionCode": "const allItems = $input.all();\n\nreturn [\n  {\n    json: {\n      data: allItems.map(i => i.json)\n    }\n  }\n];"
       },
       "id": "Aggregate",
-      "name": "Aggregate Results",
-      "type": "n8n-nodes-base.itemLists",
-      "typeVersion": 3,
-      "position": [1600, 300]
+      "name": "Aggregate All",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1400, 300]
     }
   ],
   "connections": {
@@ -109,36 +83,25 @@
       "main": [
         [
           {
-            "node": "Set Sheets",
+            "node": "Prepare Sheets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Set Sheets": {
+    "Prepare Sheets": {
       "main": [
         [
           {
-            "node": "Split Sheets",
+            "node": "Control Parallel",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Split Sheets": {
-      "main": [
-        [
-          {
-            "node": "Control Parallelism",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Control Parallelism": {
+    "Control Parallel": {
       "main": [
         [
           {
@@ -160,18 +123,18 @@
       "main": [
         [
           {
-            "node": "Filter Criteria",
+            "node": "Filter & Enrich",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Filter Criteria": {
+    "Filter & Enrich": {
       "main": [
         [
           {
-            "node": "Control Parallelism",
+            "node": "Control Parallel",
             "type": "main",
             "index": 1
           }
@@ -182,7 +145,7 @@
       "main": [
         [
           {
-            "node": "Aggregate Results",
+            "node": "Aggregate All",
             "type": "main",
             "index": 0
           }
