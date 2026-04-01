@@ -1,0 +1,193 @@
+{
+  name Parallel Google Sheets Search (Production),
+  nodes [
+    {
+      parameters {},
+      id Start,
+      name Start,
+      type n8n-nodes-base.start,
+      typeVersion 1,
+      position [200, 300]
+    },
+    {
+      parameters {
+        values {
+          json [
+            {
+              sheetId SHEET_ID_1,
+              sheetName Sheet1
+            },
+            {
+              sheetId SHEET_ID_2,
+              sheetName Sheet2
+            },
+            {
+              sheetId SHEET_ID_3,
+              sheetName Sheet3
+            }
+          ]
+        }
+      },
+      id SetSheets,
+      name Set Sheets,
+      type n8n-nodes-base.set,
+      typeVersion 2,
+      position [400, 300]
+    },
+    {
+      parameters {
+        fieldToSplitOut json
+      },
+      id SplitOut,
+      name Split Sheets,
+      type n8n-nodes-base.itemLists,
+      typeVersion 3,
+      position [600, 300]
+    },
+    {
+      parameters {
+        batchSize 3
+      },
+      id SplitInBatches,
+      name Control Parallelism,
+      type n8n-nodes-base.splitInBatches,
+      typeVersion 1,
+      position [800, 300]
+    },
+    {
+      parameters {
+        operation read,
+        sheetId ={{$json.sheetId}},
+        range ={{$json.sheetName}}!AZ
+      },
+      id GoogleSheets,
+      name Read Sheet,
+      type n8n-nodes-base.googleSheets,
+      typeVersion 4,
+      position [1000, 300],
+      credentials {
+        googleSheetsOAuth2Api {
+          id __YOUR_CREDENTIAL__,
+          name Google Sheets Account
+        }
+      }
+    },
+    {
+      parameters {
+        functionCode return items.filter(item = {n  return item.json.status === ACTIVE && Number(item.json.amount  0)  1000000;n});
+      },
+      id FilterData,
+      name Filter Criteria,
+      type n8n-nodes-base.function,
+      typeVersion 1,
+      position [1200, 300]
+    },
+    {
+      parameters {
+        mode append
+      },
+      id Merge,
+      name Merge Results,
+      type n8n-nodes-base.merge,
+      typeVersion 2,
+      position [1400, 300]
+    },
+    {
+      parameters {
+        operation aggregateItems,
+        destinationFieldName data
+      },
+      id Aggregate,
+      name Aggregate Results,
+      type n8n-nodes-base.itemLists,
+      typeVersion 3,
+      position [1600, 300]
+    }
+  ],
+  connections {
+    Start {
+      main [
+        [
+          {
+            node Set Sheets,
+            type main,
+            index 0
+          }
+        ]
+      ]
+    },
+    Set Sheets {
+      main [
+        [
+          {
+            node Split Sheets,
+            type main,
+            index 0
+          }
+        ]
+      ]
+    },
+    Split Sheets {
+      main [
+        [
+          {
+            node Control Parallelism,
+            type main,
+            index 0
+          }
+        ]
+      ]
+    },
+    Control Parallelism {
+      main [
+        [
+          {
+            node Read Sheet,
+            type main,
+            index 0
+          }
+        ],
+        [
+          {
+            node Merge Results,
+            type main,
+            index 0
+          }
+        ]
+      ]
+    },
+    Read Sheet {
+      main [
+        [
+          {
+            node Filter Criteria,
+            type main,
+            index 0
+          }
+        ]
+      ]
+    },
+    Filter Criteria {
+      main [
+        [
+          {
+            node Control Parallelism,
+            type main,
+            index 1
+          }
+        ]
+      ]
+    },
+    Merge Results {
+      main [
+        [
+          {
+            node Aggregate Results,
+            type main,
+            index 0
+          }
+        ]
+      ]
+    }
+  }
+}
